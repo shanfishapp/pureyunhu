@@ -1,15 +1,19 @@
 package io.github.shanfishapp.pureyunhu
 
+import android.annotation.SuppressLint
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.filled.Contacts
+import kotlinx.serialization.json.Json
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Stars
@@ -22,6 +26,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavHostController
@@ -29,28 +35,54 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import io.github.shanfishapp.pureyunhu.models.*
 import io.github.shanfishapp.pureyunhu.ui.screens.AboutScreen
 import io.github.shanfishapp.pureyunhu.ui.screens.ChatScreen
+import io.github.shanfishapp.pureyunhu.ui.screens.ChatViewModel
 import io.github.shanfishapp.pureyunhu.ui.screens.CommunityScreen
 import io.github.shanfishapp.pureyunhu.ui.screens.ContactScreen
+import io.github.shanfishapp.pureyunhu.ui.screens.ExtensionScreen
 import io.github.shanfishapp.pureyunhu.ui.screens.LoginScreen
+import io.github.shanfishapp.pureyunhu.ui.screens.MessageScreen
 import io.github.shanfishapp.pureyunhu.ui.screens.PersonScreen
 import io.github.shanfishapp.pureyunhu.ui.screens.RecommendScreen
 import io.github.shanfishapp.pureyunhu.ui.screens.SettingsScreen
 import io.github.shanfishapp.pureyunhu.ui.theme.PureYunhuTheme
+import io.github.shanfishapp.pureyunhu.ui.theme.ThemeManager
+import io.github.shanfishapp.pureyunhu.ui.theme.ThemeMode
+import io.github.shanfishapp.pureyunhu.ui.theme.rememberThemeState
 import io.github.shanfishapp.pureyunhu.utils.TokenManager
 import io.github.shanfishapp.pureyunhu.utils.UserInfoManager
+import io.github.shanfishapp.pureyunhu.websocket.WebSocketClient
+import io.github.shanfishapp.pureyunhu.websocket.WebSocketReceiver
+import okhttp3.Response
+import okio.ByteString
+import java.util.UUID
 
 class MainActivity : ComponentActivity() {
+    private val viewModel: ChatViewModel by viewModels()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         TokenManager.init(this)
         enableEdgeToEdge()
         setContent {
-            PureYunhuTheme {
-                AppNavigation()
+            val themeManager = remember { ThemeManager(this) }
+            val currentThemeMode = remember { mutableStateOf(themeManager.loadThemeMode()) }
+            val themeState = rememberThemeState(
+                initialMode = currentThemeMode.value,
+                onModeChange = { mode ->
+                    themeManager.saveThemeMode(mode)
+                    currentThemeMode.value = mode
+                }
+            )
+            
+            PureYunhuTheme(
+                darkTheme = themeState.isDarkTheme(isSystemInDarkTheme())
+            ) {
+                AppNavigation(chatViewModel = viewModel)
             }
         }
+        WebSocketManager.initialize(viewModel)
         
         // 如果有token，应用启动时获取一次用户信息
         if (TokenManager.hasToken()) {
@@ -109,7 +141,10 @@ val bottomNavItems = listOf(
 )
 
 @Composable
-fun AppNavigation(modifier: Modifier = Modifier) {
+fun AppNavigation(
+    modifier: Modifier = Modifier,
+    chatViewModel: ChatViewModel? = null
+) {
     val navController = rememberNavController()
 
     // 检查是否有token，决定启动页面
@@ -135,7 +170,13 @@ fun AppNavigation(modifier: Modifier = Modifier) {
             MainScaffold(
                 navController = navController,
                 showBottomBar = true,
-                content = { ChatScreen(navController) }
+                content = {
+                    if (chatViewModel != null) {
+                        ChatScreen(navController, chatViewModel)
+                    } else {
+                        ChatScreen(navController)
+                    }
+                }
             )
         }
 
@@ -190,9 +231,36 @@ fun AppNavigation(modifier: Modifier = Modifier) {
                 content = { AboutScreen(navController) }
             )
         }
+        composable("extension") {
+            MainScaffold(
+                navController = navController,
+                showBottomBar = false,
+                content = { ExtensionScreen(navController) }
+            )
+        }
+        
+        // 消息页面，支持传递chat-id和chat-type参数
+        composable(
+            "message?chat-id={chatId}&chat-type={chatType}&chat-name={chatName}",
+            arguments = listOf(
+                androidx.navigation.navArgument("chatId") { defaultValue = "" },
+                androidx.navigation.navArgument("chatType") { defaultValue = "" } ,
+                androidx.navigation.navArgument("chatName") { defaultValue = "" }
+            )
+        ) { backStackEntry ->
+            val chatId = backStackEntry.arguments?.getString("chatId") ?: ""
+            val chatType = backStackEntry.arguments?.getString("chatType") ?: ""
+            val chatName = backStackEntry.arguments?.getString("chatName") ?: ""
+            MainScaffold(
+                navController = navController,
+                showBottomBar = false, // 消息页面不显示底部导航
+                content = { MessageScreen(navController, chatId, chatType, chatName) }
+            )
+        }
     }
 }
 
+@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
 fun MainScaffold(
     navController: NavHostController,

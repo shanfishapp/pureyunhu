@@ -10,15 +10,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.CardGiftcard
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -32,6 +35,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -66,8 +70,10 @@ import retrofit2.Response
 fun PersonScreen(navController: NavController, modifier: Modifier = Modifier) {
     var isLoadingProfileInfo by remember { mutableStateOf(UserInfoManager.isLoading) }
     var userData by remember { mutableStateOf(UserInfoManager.userInfo) }
+    var userHomepageData by remember { mutableStateOf(UserInfoManager.getCachedUserHomepageInfo()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoggingOut by remember { mutableStateOf(false) }
+    var showLogoutDialog by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
@@ -76,13 +82,17 @@ fun PersonScreen(navController: NavController, modifier: Modifier = Modifier) {
         UserInfoManager.getUserInfo { userInfo ->
             userData = userInfo
             isLoadingProfileInfo = UserInfoManager.isLoading
+            
+            // 获取缓存的用户主页信息
+            userHomepageData = UserInfoManager.getCachedUserHomepageInfo()
         }
     }
 
     // 监听UserInfoManager的状态变化
-    LaunchedEffect(UserInfoManager.userInfo, UserInfoManager.isLoading) {
+    LaunchedEffect(UserInfoManager.userInfo, UserInfoManager.isLoading, UserInfoManager.getCachedUserHomepageInfo()) {
         userData = UserInfoManager.userInfo
         isLoadingProfileInfo = UserInfoManager.isLoading
+        userHomepageData = UserInfoManager.getCachedUserHomepageInfo()
     }
 
     Scaffold(
@@ -115,9 +125,9 @@ fun PersonScreen(navController: NavController, modifier: Modifier = Modifier) {
             if (isLoadingProfileInfo) {
                 Card(
                     modifier = Modifier
-                        .height(160.dp)
+                        .height(120.dp)
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 0.dp),
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                     shape = RoundedCornerShape(16.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                 ) {
@@ -126,7 +136,6 @@ fun PersonScreen(navController: NavController, modifier: Modifier = Modifier) {
                         contentAlignment = Alignment.Center
                     ) {
                         Column(
-                            modifier = Modifier.fillMaxSize(),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
@@ -135,12 +144,29 @@ fun PersonScreen(navController: NavController, modifier: Modifier = Modifier) {
                         }
                     }
                 }
+                
+                // 加载状态下的统计卡片
+                Card(
+                    modifier = Modifier
+                        .height(80.dp)
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("加载中...")
+                    }
+                }
             } else if (errorMessage != null) {
                 Card(
                     modifier = Modifier
-                        .height(160.dp)
+                        .height(120.dp)
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 0.dp),
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                     shape = RoundedCornerShape(16.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                 ) {
@@ -151,18 +177,43 @@ fun PersonScreen(navController: NavController, modifier: Modifier = Modifier) {
                         Text("错误: $errorMessage")
                     }
                 }
+                
+                // 错误状态下的统计卡片
+                Card(
+                    modifier = Modifier
+                        .height(80.dp)
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("无法加载统计数据")
+                    }
+                }
             } else if (userData != null) {
-                UserProfileCard(userData = userData!!.data.user)
+                UserProfileCard(
+                    basicUserData = userData!!.data.user,
+                    homepageUserData = userHomepageData
+                )
+                
+                UserStatsCard(
+                    homepageUserData = userHomepageData,
+                    basicUserData = userData!!.data.user
+                )
             }
             Card(
-                modifier = Modifier.height(120.dp).fillMaxWidth().padding(horizontal = 16.dp, vertical = 15.dp),  // 总体宽度固定为140.dp
-                shape = RoundedCornerShape(16.dp),  // 外部卡片圆角
+                modifier = Modifier.height(120.dp).fillMaxWidth().padding(horizontal = 16.dp, vertical = 15.dp),
+                shape = RoundedCornerShape(16.dp),
                 elevation = CardDefaults.cardElevation(2.dp)
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 12.dp),  // 内部间距
+                        .padding(vertical = 12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     // 功能卡片行
@@ -176,7 +227,7 @@ fun PersonScreen(navController: NavController, modifier: Modifier = Modifier) {
                         // 每周抽奖 - 无背景色卡片
                         TransparentFunctionCard(
                             icon = Icons.Default.CardGiftcard,
-                            title = "每周抽奖",  // 手动换行，适应小宽度
+                            title = "每周抽奖",
                             modifier = Modifier.weight(1f)
                         )
 
@@ -196,13 +247,49 @@ fun PersonScreen(navController: NavController, modifier: Modifier = Modifier) {
 
                         // 任务中心 - 无背景色卡片
                         TransparentFunctionCard(
-                            icon = Icons.Default.Assignment,
+                            icon = Icons.AutoMirrored.Filled.Assignment,
                             title = "任务中心",
                             modifier = Modifier.weight(1f)
                         )
                     }
                 }
             }
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                    .height(144.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .padding(end = 10.dp)
+                ) {
+                    Text("修改个人资料", fontSize = 13.sp, modifier = Modifier.align(Alignment.CenterStart).padding(start = 20.dp))
+                    Icon(Icons.Default.ChevronRight, "跳转", modifier = Modifier.align(Alignment.CenterEnd).padding(end = 8.dp))
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .padding(end = 10.dp)
+                ) {
+                    Text("进入机器人控制台", fontSize = 13.sp, modifier = Modifier.align(Alignment.CenterStart).padding(start = 20.dp))
+                    Icon(Icons.Default.ChevronRight, "跳转", modifier = Modifier.align(Alignment.CenterEnd).padding(end = 8.dp))
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .padding(end = 10.dp)
+                ) {
+                    Text("PureYunhu 官方用户群", fontSize = 13.sp, modifier = Modifier.align(Alignment.CenterStart).padding(start = 20.dp))
+                    Icon(Icons.Default.ChevronRight, "跳转", modifier = Modifier.align(Alignment.CenterEnd).padding(end = 8.dp))
+                }
+            }
+
             // 退出登录按钮
             Button(
                 modifier = Modifier
@@ -210,50 +297,7 @@ fun PersonScreen(navController: NavController, modifier: Modifier = Modifier) {
                     .padding(horizontal = 16.dp, vertical = 8.dp)
                     .height(48.dp),
                 onClick = {
-                    isLoggingOut = true
-
-                    // 获取token
-                    val token = TokenManager.get() ?: ""
-
-                    // 调用退出登录接口
-                    ApiClient.apiService.logOut(
-                        logOutRequest = LogOutRequest("pureyunhu"),
-                        token = token
-                    ).enqueue(object : Callback<GeneralResponse> {
-                        override fun onResponse(
-                            call: Call<GeneralResponse>,
-                            response: Response<GeneralResponse>
-                        ) {
-                            isLoggingOut = false
-
-                            if (response.isSuccessful) {
-                                // 显示成功消息
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar("退出登录成功")
-                                }
-                            } else {
-                                // 显示失败消息
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar("退出登录失败: ${response.code()}")
-                                }
-                            }
-
-                            // 无论成功失败，都需要清除本地数据和跳转到登录页
-                            performLogout(navController)
-                        }
-
-                        override fun onFailure(call: Call<GeneralResponse>, t: Throwable) {
-                            isLoggingOut = false
-
-                            // 显示网络错误消息
-                            coroutineScope.launch {
-                                snackbarHostState.showSnackbar("网络错误: ${t.message}")
-                            }
-
-                            // 网络失败也清除本地数据和跳转到登录页
-                            performLogout(navController)
-                        }
-                    })
+                    showLogoutDialog = true
                 },
                 enabled = !isLoggingOut,
                 colors = ButtonDefaults.buttonColors(
@@ -279,6 +323,108 @@ fun PersonScreen(navController: NavController, modifier: Modifier = Modifier) {
             }
         }
     }
+
+    // 退出登录确认弹窗
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showLogoutDialog = false
+            },
+            title = {
+                Text(
+                    text = "退出登录",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+            },
+            text = {
+                Text(
+                    text = "确定要退出登录吗？",
+                    fontSize = 16.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showLogoutDialog = false
+                        performLogoutWithApi(navController, snackbarHostState, coroutineScope) { loading ->
+                            isLoggingOut = loading
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF851717)
+                    )
+                ) {
+                    Text("确定", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showLogoutDialog = false
+                    }
+                ) {
+                    Text("取消")
+                }
+            },
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
+}
+
+/**
+ * 执行退出登录的API调用和清理操作
+ */
+private fun performLogoutWithApi(
+    navController: NavController,
+    snackbarHostState: SnackbarHostState,
+    coroutineScope: kotlinx.coroutines.CoroutineScope,
+    onLoadingChange: (Boolean) -> Unit
+) {
+    onLoadingChange(true)
+
+    // 获取token
+    val token = TokenManager.get() ?: ""
+
+    // 调用退出登录接口
+    ApiClient.apiService.logOut(
+        logOutRequest = LogOutRequest("pureyunhu"),
+        token = token
+    ).enqueue(object : Callback<GeneralResponse> {
+        override fun onResponse(
+            call: Call<GeneralResponse>,
+            response: Response<GeneralResponse>
+        ) {
+            onLoadingChange(false)
+
+            if (response.isSuccessful) {
+                // 显示成功消息
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar("退出登录成功")
+                }
+            } else {
+                // 显示失败消息
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar("退出登录失败: ${response.code()}")
+                }
+            }
+
+            // 无论成功失败，都需要清除本地数据和跳转到登录页
+            performLogout(navController)
+        }
+
+        override fun onFailure(call: Call<GeneralResponse>, t: Throwable) {
+            onLoadingChange(false)
+
+            // 显示网络错误消息
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar("网络错误: ${t.message}")
+            }
+
+            // 网络失败也清除本地数据和跳转到登录页
+            performLogout(navController)
+        }
+    })
 }
 
 /**
@@ -301,10 +447,13 @@ private fun performLogout(navController: NavController) {
 }
 
 @Composable
-fun UserProfileCard(userData: GetUserInfo.GetUserInfoUser) {
+fun UserProfileCard(
+    basicUserData: GetUserInfo.GetUserInfoUser,
+    homepageUserData: io.github.shanfishapp.pureyunhu.models.UserHomepageInfo.UserHomepageUser?
+) {
     Card(
         modifier = Modifier
-            .height(160.dp)
+            .height(120.dp)
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
         shape = RoundedCornerShape(16.dp),
@@ -318,11 +467,10 @@ fun UserProfileCard(userData: GetUserInfo.GetUserInfoUser) {
         ) {
             // 头像
             AsyncImageRefer(
-                imageUrl = userData.avatarUrl,
+                imageUrl = basicUserData.avatarUrl,
                 contentDescription = "用户头像",
                 modifier = Modifier
                     .size(80.dp)
-                    .clip(CircleShape),
             )
 
             // 昵称和ID信息
@@ -332,19 +480,98 @@ fun UserProfileCard(userData: GetUserInfo.GetUserInfoUser) {
                     .padding(start = 16.dp),
                 verticalArrangement = Arrangement.Center
             ) {
-                Text(
-                    text = userData.nickname,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // 显示昵称，VIP用户为金色
+                    Text(
+                        text = basicUserData.nickname,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (homepageUserData?.isVip == 1) Color(0xFFFFD700) else MaterialTheme.colorScheme.onSurface
+                    )
+                    
+                    // 如果是VIP用户，显示VIP图标
+                    if (homepageUserData?.isVip == 1) {
+                        Icon(
+                            imageVector = Icons.Default.AttachMoney, // 使用金币图标表示VIP
+                            contentDescription = "VIP",
+                            modifier = Modifier
+                                .padding(start = 4.dp)
+                                .size(20.dp),
+                            tint = Color(0xFFFFD700) // 金色
+                        )
+                    }
+                }
 
                 Text(
-                    text = "ID: ${userData.userId}",
+                    text = "ID: ${basicUserData.userId}",
                     fontSize = 14.sp,
                     color = Color.Gray
                 )
             }
         }
+    }
+}
+
+@Composable
+fun UserStatsCard(homepageUserData: io.github.shanfishapp.pureyunhu.models.UserHomepageInfo.UserHomepageUser?, basicUserData: GetUserInfo.GetUserInfoUser) {
+    Card(
+        modifier = Modifier
+            .height(100.dp)
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // 在线天数
+            StatItem(
+                value = homepageUserData?.onLineDay.toString() ?: "0",
+                label = "在线天数",
+                modifier = Modifier.weight(1f)
+            )
+            
+            // 连续在线天数
+            StatItem(
+                value = homepageUserData?.continuousOnLineDay.toString() ?: "0",
+                label = "连续在线",
+                modifier = Modifier.weight(1f)
+            )
+
+            // 金币数量
+            StatItem(
+                value = basicUserData.goldCoinAmount.toString(),
+                label = "金币",
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+fun StatItem(value: String, label: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = value,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            color = Color.Gray
+        )
     }
 }
 
@@ -356,11 +583,11 @@ fun TransparentFunctionCard(
     modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = modifier.height(80.dp),  // 固定高度
+        modifier = modifier.height(80.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color.Transparent  // 设置背景色为透明
+            containerColor = Color.Transparent
         ),
-        elevation = CardDefaults.cardElevation(0.dp)  // 去除阴影
+        elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(
             modifier = Modifier
@@ -372,13 +599,13 @@ fun TransparentFunctionCard(
             Icon(
                 imageVector = icon,
                 contentDescription = title,
-                modifier = Modifier.size(24.dp),  // 小尺寸图标
+                modifier = Modifier.size(24.dp),
                 tint = MaterialTheme.colorScheme.primary
             )
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            Text(text = title, fontSize=12.sp)
+            Text(text = title, fontSize = 12.sp)
         }
     }
 }

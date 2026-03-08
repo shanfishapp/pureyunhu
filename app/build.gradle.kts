@@ -1,3 +1,4 @@
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -6,9 +7,7 @@ plugins {
 
 android {
     namespace = "io.github.shanfishapp.pureyunhu"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 36  // 简化写法
 
     defaultConfig {
         applicationId = "io.github.shanfishapp.pureyunhu"
@@ -29,14 +28,17 @@ android {
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
     buildFeatures {
         compose = true
     }
 }
+
 
 dependencies {
     implementation(libs.androidx.core.ktx)
@@ -51,8 +53,7 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.okhttp.logging.interceptor)
     implementation(libs.retrofit)
-    implementation(libs.retrofit)
-    implementation(libs.protobuf.kotlin.lite)
+    implementation(libs.protobuf.kotlin.lite)  // protobuf Kotlin lite 依赖
     implementation(libs.androidx.material3)
     implementation(libs.androidx.ui)
     implementation("androidx.compose.material:material-icons-extended:1.6.8")
@@ -60,4 +61,11 @@ dependencies {
     implementation(libs.androidx.compose.foundation.layout)
     implementation("io.coil-kt:coil-compose:2.6.0")
     implementation("me.zhanghai.compose.preference:preference:2.1.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.10.0")
+    // WebView Compose 依赖
+    implementation("androidx.compose.ui:ui-viewbinding:1.6.8")
+    implementation("androidx.webkit:webkit:1.10.0")
+    // 如果你需要标准 protobuf 而不是 lite 版本，使用这个
+    // implementation(libs.protobuf.javalite)
 }

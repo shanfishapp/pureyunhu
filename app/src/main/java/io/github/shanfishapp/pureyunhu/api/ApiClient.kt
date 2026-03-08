@@ -10,7 +10,7 @@ object ApiClient {
     private const val BASE_URL = "https://chat-go.jwzhd.com/" // 保留基础URL，但API端点使用完整URL
 
     // 1. 配置 OkHttpClient
-    private val okHttpClient: OkHttpClient by lazy {
+    val okHttpClient: OkHttpClient by lazy {
         val logging = HttpLoggingInterceptor().apply {
             // 设置日志级别为 BODY，可以打印出完整的请求和响应数据
             level = HttpLoggingInterceptor.Level.BODY

@@ -14,7 +14,7 @@ data class GetUserInfo(
         val phone: String,
         val avatarId: String,
         val avatarUrl: String,
-        val goldCoinCount: Double
+        val goldCoinAmount: Float
     )
 }
 

@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.BrightnessMedium
 import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
@@ -24,7 +25,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -37,13 +43,25 @@ import io.github.shanfishapp.pureyunhu.ui.components.ListSettingItem
 import io.github.shanfishapp.pureyunhu.ui.components.NavigateSettingItem
 import io.github.shanfishapp.pureyunhu.ui.components.SettingItem
 import io.github.shanfishapp.pureyunhu.ui.components.SwitchSettingItem
+import io.github.shanfishapp.pureyunhu.ui.theme.ThemeManager
+import io.github.shanfishapp.pureyunhu.ui.theme.ThemeMode
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(navController: NavController) {
+    // 使用一个状态来跟踪是否正在导航，防止重复点击
+    var isNavigating by remember { mutableStateOf(false) }
+    
+    val context = LocalContext.current
+    val themeManager = remember { ThemeManager(context) }
     val themeOptions = listOf("跟随系统", "浅色模式", "深色模式")
     val languageOptions = listOf("简体中文", "English", "日本語", "한국어")
+    val currentThemeIndex = when (themeManager.loadThemeMode()) {
+        ThemeMode.SYSTEM -> 0
+        ThemeMode.LIGHT -> 1
+        ThemeMode.DARK -> 2
+    }
 
     Scaffold(
         topBar = {
@@ -52,8 +70,13 @@ fun SettingsScreen(navController: NavController) {
                 navigationIcon = {
                     IconButton(
                         onClick = {
-                            navController.navigateUp()
-                        }
+                            // 防止重复点击
+                            if (!isNavigating) {
+                                isNavigating = true
+                                navController.navigateUp()
+                            }
+                        },
+                        enabled = !isNavigating // 当正在导航时禁用按钮
                     ) {
                         Icon(
                             imageVector = Icons.Default.ChevronLeft,
@@ -81,19 +104,17 @@ fun SettingsScreen(navController: NavController) {
                 )
             }
 
-            // 语言选择
+            // 版本信息
             item {
-                ListSettingItem(
-                    setting = ListSetting(
-                        key = "language",
-                        title = "语言",
-                        subTitle = "选择应用显示语言",
-                        items = languageOptions,
-                        icon = Icons.Default.Language
+                ClickSettingItem(
+                    setting = SettingItem(
+                        key = "extension",
+                        title = "扩展",
+                        subTitle = "开启官方扩展",
+                        icon = Icons.Default.Extension
                     ),
-                    onItemSelected = { index, value ->
-                        // 可以在这里处理语言切换逻辑
-                        println("Language selected: $value")
+                    onClick = {
+                        navController.navigate("extension")
                     }
                 )
             }
@@ -107,7 +128,16 @@ fun SettingsScreen(navController: NavController) {
                         subTitle = "选择应用主题模式",
                         items = themeOptions,
                         icon = Icons.Default.BrightnessMedium
-                    )
+                    ),
+                    onItemSelected = { index, _ ->
+                        val selectedThemeMode = when (index) {
+                            0 -> ThemeMode.SYSTEM
+                            1 -> ThemeMode.LIGHT
+                            2 -> ThemeMode.DARK
+                            else -> ThemeMode.SYSTEM
+                        }
+                        themeManager.saveThemeMode(selectedThemeMode)
+                    }
                 )
             }
 
